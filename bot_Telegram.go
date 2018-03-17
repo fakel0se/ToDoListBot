@@ -1,5 +1,6 @@
 package main
 
+//go run bot_Telegram.go GalendarBot.go
 import (
 	"log"
 
@@ -12,42 +13,38 @@ func main() {
 		log.Panic(err)
 	}
 	bot.Debug = true
-	bot.Debug = true
 	log.Printf("Authorized on account %s", bot.Self.UserName)
-	//TODO: Ожидание входящего сообщения в цикле. А так же сделать получение именно последнего сообщения
 	// инициализируем канал, куда будут прилетать обновления от API
 	var ucfg tgbotapi.UpdateConfig = tgbotapi.NewUpdate(0)
 	ucfg.Timeout = 60
-	// updch, err := bot.GetUpdatesChan(ucfg) //updates channel
 	// читаем обновления из канала
-	// for {
-	var updates []tgbotapi.Update
-	updates, err = bot.GetUpdates(ucfg)
+	updates, err := bot.GetUpdatesChan(ucfg)
 	if err != nil {
 		log.Panic(err)
 	}
-	update := updates[1] //номер сообщение
-	// select {
-	// case <-updates:
-	// Пользователь, который написал боту
-	UserName := update.Message.From.UserName
+	for update := range updates {
+		// Пользователь, который написал боту
+		UserName := update.Message.From.UserName
 
-	// ID чата/диалога.
-	// Может быть идентификатором как чата с пользователем
-	// (тогда он равен UserID) так и публичного чата/канала
-	ChatID := update.Message.Chat.ID
+		// ID чата/диалога.
+		// Может быть идентификатором как чата с пользователем
+		// (тогда он равен UserID) так и публичного чата/канала
+		ChatID := update.Message.Chat.ID
+		var reply string
+		var Text string
+		if update.Message.Command() != "" {
+			reply = ParseCommand(update.Message.Command(), UserName)
+		} else {
+			//Получем сообщение и парсим его
+			Text = update.Message.Text
+			reply = ParseText(Text, UserName)
+		}
 
-	// Текст сообщения
-	Text := update.Message.Text
+		log.Printf("[%s] %d %s", UserName, ChatID, Text)
 
-	log.Printf("[%s] %d %s", UserName, ChatID, Text)
-
-	// Ответим пользователю его же сообщением
-	reply := Text
-	// Созадаем сообщение
-	msg := tgbotapi.NewMessage(ChatID, reply)
-	// и отправляем его
-	bot.Send(msg)
-	// }
-	// }
+		// Созадаем сообщение
+		msg := tgbotapi.NewMessage(ChatID, reply)
+		// и отправляем его
+		bot.Send(msg)
+	}
 }
