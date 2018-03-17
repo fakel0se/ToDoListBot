@@ -13,11 +13,12 @@ import (
 	"path/filepath"
 	"time"
 
-	//"golang.org/x/net/context"
 	"golang.org/x/oauth2"               //"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"        //"golang.org/x/oauth2/google"
 	"google.golang.org/api/calendar/v3" //"google.golang.org/api/calendar/v3"
 )
+
+var username = "COSFAR"
 
 //использует Context и Config для извлечения токена
 //затем генеруруем клиент, return возвращает сгенерированного клиента
@@ -91,8 +92,6 @@ func saveToken(file string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
-var username = "COSFAR"
-
 func main() {
 	ctx := context.Background()
 
@@ -103,7 +102,7 @@ func main() {
 
 	//если при именении этих областей, удалите ранее созданные учетные данные в
 	// at ~/.credentials/calendar-go-quickstart.json
-	config, err := google.ConfigFromJSON(b, calendar.CalendarReadonlyScope)
+	config, err := google.ConfigFromJSON(b, calendar.CalendarScope)
 	if err != nil {
 		log.Fatalf("Не удается проанализировать секретный файл клиента для настройки: %v", err)
 	}
@@ -120,7 +119,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Не удается получить следующие десять событий пользователя. %v", err)
 	}
-
+	
+	calendars, err := srv.CalendarList.List().Do();
+	if len(calendars.Items) > 0 {
+		for _, i := range calendars.Items {
+			fmt.Printf("%s (%s) \n", i.Id, i.Summary)
+		}
+	}
+	
 	fmt.Println("Ближайшие события:")
 	if len(events.Items) > 0 {
 		for _, i := range events.Items {
@@ -131,10 +137,55 @@ func main() {
 			} else {
 				when = i.Start.Date
 			}
-			fmt.Printf("%s (%s)\n", i.Summary, when)
+			fmt.Printf("%s (%s) (%s)\n", i.Id, i.Summary, when)
 		}
 	} else {
 		fmt.Printf("Предстоящие события не найдены.\n")
 	}
+	
+		
+	fmt.Println("\nВведите задание:\n0 - Добавить задачу\n1 - Изменить задачу\n2 - Удалить задачу\n3 - Показать задачи\nИ нажмите Enter\n")
+	var i int;
+	_, err = fmt.Scanf("%d", &i)
+	if (err != nil) {
+	  fmt.Println("wtf: ", err)
+	}
+	
+	switch i {
+	case 0:
+		//addEvt();
+		
+	case 1:
+		//updateEvt()
+	case 2:
+		//deleteEvt()
+		var eventID string		
+		fmt.Println("Введите ID события:")
+		_, err = fmt.Scanf("%s", &eventID)		
+		err = srv.Events.Delete("primary", eventID).Do()
+		if (err != nil) {
+			fmt.Println("wtf: ", err)		
+		}
+	case 3:
+		//showEvts()
+		fmt.Println("Ближайшие события:")
+		if len(events.Items) > 0 {
+			for _, i := range events.Items {
+				var when string
+				//если время пустая строка событие является на весь день, так как доступна только дата
+				if i.Start.DateTime != "" {
+					when = i.Start.DateTime
+				} else {
+					when = i.Start.Date
+				}
+				fmt.Printf("%s (%s) (%s)\n", i.Id, i.Summary, when)
+			}
+		} else {
+			fmt.Printf("Предстоящие события не найдены.\n")
+		}
+	default:
+		fmt.Println("wtf: incorrect value")
+	}
+
 
 }
