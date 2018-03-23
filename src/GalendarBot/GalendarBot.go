@@ -1,8 +1,5 @@
 package GalendarBot
 
-//1. криво добавляет имя события, пробел и время
-//2. добавить событие к уже существующему json
-
 import (
 	"log"
 	"os"
@@ -59,9 +56,9 @@ func DateParse(Date string, Time string) string {
 	return times
 }
 
-func WorkMake(Word []string) event {
+func WorkMake(Word []string) Event {
 	//TODO:Нужно сделать хоть как-то
-	var Work event
+	var Work Event
 	//позиция даты
 	k := 0
 	for i := 1; i < len(Word)-1; i++ {
@@ -115,7 +112,7 @@ func ParseText(Text string, UserName string) string {
 	Work = ReadJson(UserName)
 	// log.Println(Work.Areas[])
 	if Work.Areas == nil {
-		ar := area{"Неразмечено", nil}
+		ar := Area{"Неразмечено", nil}
 		Work.Areas = append(Work.Areas, ar)
 	}
 	Work.Areas[0].Events = append(Work.Areas[0].Events, WorkMake(Word))
@@ -181,18 +178,18 @@ func ParseText(Text string, UserName string) string {
 type JsonStruct struct {
 	UserName string   //Имя пользователя
 	Settings settings //Настройки
-	Areas    []area   //Сфры дейтельности
+	Areas    []Area   //Сфры дейтельности
 
 }
 
 //Структура сфер дейтельности
-type area struct {
+type Area struct {
 	AreaName string
-	Events   []event //Дела
+	Events   []Event //Дела
 }
 
 //Структура дел	*-по Google API
-type event struct {
+type Event struct {
 	EventName          string                 //Название дела
 	DateTimeLastChange string                 //Дата и время последнего изменения
 	Description        string                 //Описания*
@@ -298,10 +295,10 @@ func GetWorksOnTomorrow(UserName string) string {
 }
 
 func CreateWork(Work JsonStruct, UserName string) bool {
-	GoogleWrap.Auth(UserName)
+	// GoogleWrap.Auth(UserName)
 	Workevent := ConverToDOtoEvent(Work.Areas[0].Events[0])
 	log.Printf("\n11111111111111111111111\n" + Work.UserName)
-	return GoogleWrap.AddEvent(Workevent)
+	return GoogleWrap.AddEvent(Workevent, Work.UserName)
 	//запрос к bot_Galendar
 	return true
 }
@@ -316,7 +313,7 @@ func DeleteWork(Work JsonStruct, UserName string) bool {
 	return true
 }
 
-func ConverToDOtoEvent(Event event) *calendar.Event {
+func ConverToDOtoEvent(Event Event) *calendar.Event {
 	event := &calendar.Event{
 		Summary:     Event.EventName,
 		Description: "Event.Name",

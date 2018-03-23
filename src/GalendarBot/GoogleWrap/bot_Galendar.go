@@ -18,12 +18,12 @@ import (
 	"google.golang.org/api/calendar/v3" //"google.golang.org/api/calendar/v3"
 )
 
-var srv *calendar.Service
+var Srv *calendar.Service
 
 //использует Context и Config для извлечения токена
 //затем генеруруем клиент, return возвращает сгенерированного клиента
 func getConfig() *oauth2.Config {
-	b, err := ioutil.ReadFile("./GalendarBot/GoogleWrap/client_secret.json")
+	b, err := ioutil.ReadFile("../GalendarBot/GoogleWrap/client_secret.json")
 	if err != nil {
 		log.Fatalf("Не удается прочитать секретный файл клиента: %v", err)
 		return nil
@@ -121,7 +121,7 @@ func tokenCacheFile(username string) (string, error) {
 		return "", err
 	}
 	log.Println(usr.HomeDir)
-	tokenCacheDir := filepath.Join("./temp/", ".credentials")
+	tokenCacheDir := filepath.Join("../temp/", ".credentials")
 	os.MkdirAll(tokenCacheDir, 0700)
 	return filepath.Join(tokenCacheDir,
 		url.QueryEscape("calendar"+username+".json")), err
@@ -132,6 +132,7 @@ func tokenCacheFile(username string) (string, error) {
 func tokenFromFile(file string) (*oauth2.Token, error) {
 	f, err := os.Open(file)
 	if err != nil {
+		log.Println("Не могу открыть " + file)
 		return nil, err
 	}
 	t := &oauth2.Token{}
@@ -151,9 +152,9 @@ func saveToken1(file string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
-func ShowEvents( /*srv *calendar.Service*/ ) string {
+func ShowEvents( /*Srv *calendar.Service*/ ) string {
 	t := time.Now().Format(time.RFC3339)
-	events, err := srv.Events.List("primary").ShowDeleted(false).
+	events, err := Srv.Events.List("primary").ShowDeleted(false).
 		SingleEvents(true).TimeMin(t).MaxResults(10).OrderBy("startTime").Do()
 	if err != nil {
 		log.Fatalf("Не удается получить следующие десять событий пользователя. %v", err)
@@ -179,27 +180,30 @@ func ShowEvents( /*srv *calendar.Service*/ ) string {
 	}
 }
 
-
-func AddEvent( /*Event ToDo*/ event *calendar.Event /*, srv *calendar.Service*/) bool {
-	event, err := srv.Events.Insert("primary", event).Do()
-	if err != nil {
-		log.Fatalf("Unable to create event. %v\n", err)
-		return false
+func AddEvent( /*Event ToDo*/ event *calendar.Event /*, Srv *calendar.Service*/, UserName string) bool {
+	if Auth(UserName) {
+		event, err := Srv.Events.Insert("primary", event).Do()
+		if err != nil {
+			log.Fatalf("Unable to create event. %v\n", err)
+			return false
+		}
+		fmt.Printf("Event created: %s\n", event.HtmlLink)
+		return true
 	}
-	fmt.Printf("Event created: %s\n", event.HtmlLink)
-	return true
+	log.Println("Ошибка при авторизации!")
+	return false
 }
 
-func UpdateEvent(event *calendar.Event /*, srv *calendar.Service*/, eventID string) {
-	event, err := srv.Events.Patch("primary", eventID, event).Do()
+func UpdateEvent(event *calendar.Event /*, Srv *calendar.Service*/, eventID string) {
+	event, err := Srv.Events.Patch("primary", eventID, event).Do()
 	if err != nil {
 		log.Fatalf("Unable to create event. %v\n", err)
 	}
 	fmt.Printf("Event Updated: %s\n", event.HtmlLink)
 }
 
-func DeleteEvent(event *calendar.Event /*, srv *calendar.Service*/, eventID string) {
-	err := srv.Events.Delete("primary", eventID).Do()
+func DeleteEvent(event *calendar.Event /*, Srv *calendar.Service*/, eventID string) {
+	err := Srv.Events.Delete("primary", eventID).Do()
 	if err != nil {
 		log.Fatalf("Unable to delete event. %v", err)
 	}
@@ -214,11 +218,12 @@ func Auth(clientID string) bool {
 	client := getClient(ctx, config, clientID)
 
 	if client == nil {
+		log.Println("Клиент не найден!!!")
 		return false
 	}
 
 	var err error
-	srv, err = calendar.New(client)
+	Srv, err = calendar.New(client)
 	if err != nil {
 		log.Fatalf("Не удается получить клиента календаря %v", err)
 		//return false
@@ -239,7 +244,7 @@ func Auth(clientID string) bool {
 			},
 		}
 
-		addEvent(event, srv)
+		addEvent(event, Srv)
 	*/
 
 }
