@@ -192,6 +192,7 @@ func ShowEvents(/*srv *calendar.Service*/) string {
 }
 
 func AddEvent(Event ToDo/*event *calendar.Event, srv *calendar.Service*/) bool {
+	event := converToDOtoEvent(Event)
 	event, err := srv.Events.Insert("primary", event).Do()
 	if err != nil {
 		log.Fatalf("Unable to create event. %v\n", err)
