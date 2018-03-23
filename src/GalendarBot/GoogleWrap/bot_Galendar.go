@@ -11,22 +11,12 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"time"	
+	"time"
 
 	"golang.org/x/oauth2"               //"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"        //"golang.org/x/oauth2/google"
 	"google.golang.org/api/calendar/v3" //"google.golang.org/api/calendar/v3"
 )
-
-
-type ToDo struct {
-	Name      string
-	Date      string
-	Time      string
-	Important	string
-	Area      string
-}
-
 
 var srv *calendar.Service
 
@@ -46,7 +36,7 @@ func getConfig() *oauth2.Config {
 		log.Fatalf("Не удается проанализировать секретный файл клиента для настройки: %v", err)
 		return nil
 	}
-	
+
 	return config
 }
 
@@ -65,7 +55,6 @@ func getClient(ctx context.Context, config *oauth2.Config, clientID string) *htt
 }
 */
 
-	
 func getClient(ctx context.Context, config *oauth2.Config, clientID string) *http.Client {
 	cacheFile, err := tokenCacheFile(clientID)
 	if err != nil {
@@ -76,9 +65,8 @@ func getClient(ctx context.Context, config *oauth2.Config, clientID string) *htt
 		return nil
 	}
 	return config.Client(ctx, tok)
-}	
+}
 
-//ЭТО НАДО В БОТ ТЕЛЕГРАМА
 //использует Config для запроса токена
 //return возвращает полученный токен
 func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
@@ -111,7 +99,7 @@ func SaveToken(code string, clientID string) bool {
 		log.Fatalf("Не удается получить маркер из интернета %v", err)
 		return false
 	}
-	
+
 	cacheFile, err := tokenCacheFile(clientID)
 	fmt.Printf("Сохранение файла учетных данных в: %s\n", cacheFile)
 	f, err := os.OpenFile(cacheFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
@@ -121,7 +109,7 @@ func SaveToken(code string, clientID string) bool {
 	}
 	defer f.Close()
 	json.NewEncoder(f).Encode(tok)
-	
+
 	return true
 }
 
@@ -163,14 +151,14 @@ func saveToken1(file string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
-func ShowEvents(/*srv *calendar.Service*/) string {
+func ShowEvents( /*srv *calendar.Service*/ ) string {
 	t := time.Now().Format(time.RFC3339)
 	events, err := srv.Events.List("primary").ShowDeleted(false).
 		SingleEvents(true).TimeMin(t).MaxResults(10).OrderBy("startTime").Do()
 	if err != nil {
 		log.Fatalf("Не удается получить следующие десять событий пользователя. %v", err)
 	}
-	
+
 	buffer := ""
 	if len(events.Items) > 0 {
 		for _, i := range events.Items {
@@ -191,7 +179,7 @@ func ShowEvents(/*srv *calendar.Service*/) string {
 	}
 }
 
-func AddEvent(Event ToDo/*event *calendar.Event, srv *calendar.Service*/) bool {
+func AddEvent( /*Event ToDo*/ event *calendar.Event /*, srv *calendar.Service*/) bool {
 	event, err := srv.Events.Insert("primary", event).Do()
 	if err != nil {
 		log.Fatalf("Unable to create event. %v\n", err)
@@ -201,7 +189,7 @@ func AddEvent(Event ToDo/*event *calendar.Event, srv *calendar.Service*/) bool {
 	return true
 }
 
-func UpdateEvent(event *calendar.Event/*, srv *calendar.Service*/, eventID string) {
+func UpdateEvent(event *calendar.Event /*, srv *calendar.Service*/, eventID string) {
 	event, err := srv.Events.Patch("primary", eventID, event).Do()
 	if err != nil {
 		log.Fatalf("Unable to create event. %v\n", err)
@@ -209,65 +197,48 @@ func UpdateEvent(event *calendar.Event/*, srv *calendar.Service*/, eventID strin
 	fmt.Printf("Event Updated: %s\n", event.HtmlLink)
 }
 
-func DeleteEvent(event *calendar.Event/*, srv *calendar.Service*/, eventID string) {		
+func DeleteEvent(event *calendar.Event /*, srv *calendar.Service*/, eventID string) {
 	err := srv.Events.Delete("primary", eventID).Do()
-	if (err != nil) {
-		log.Fatalf("Unable to delete event. %v", err)	
+	if err != nil {
+		log.Fatalf("Unable to delete event. %v", err)
 	}
 	fmt.Printf("Event Deleted")
 }
 
 func Auth(clientID string) bool {
 	ctx := context.Background()
-	
-	config := getConfig();
-	
+
+	config := getConfig()
+
 	client := getClient(ctx, config, clientID)
-	
-	if (client == nil) {
+
+	if client == nil {
 		return false
 	}
-	
+
 	var err error
 	srv, err = calendar.New(client)
 	if err != nil {
 		log.Fatalf("Не удается получить клиента календаря %v", err)
 		//return false
 	}
-	
+
 	return true
-/*
-	event := &calendar.Event{
-		Summary:     "и3менить",
-		Description: "sdasdsadasd",
-		Start: &calendar.EventDateTime{
-			DateTime: "2018-03-11T08:00:00+08:00",
-			TimeZone: "Asia/Irkutsk",
-		},
-		End: &calendar.EventDateTime{
-			DateTime: "2018-03-11T09:00:00+08:00",
-			TimeZone: "Asia/Irkutsk",
-		},
-	}
+	/*
+		event := &calendar.Event{
+			Summary:     "и3менить",
+			Description: "sdasdsadasd",
+			Start: &calendar.EventDateTime{
+				DateTime: "2018-03-11T08:00:00+08:00",
+				TimeZone: "Asia/Irkutsk",
+			},
+			End: &calendar.EventDateTime{
+				DateTime: "2018-03-11T09:00:00+08:00",
+				TimeZone: "Asia/Irkutsk",
+			},
+		}
 
-	addEvent(event, srv)
-*/
+		addEvent(event, srv)
+	*/
 
-}
-
-func converToDOtoEvent(Event ToDo) *calendar.Event {
-	event := &calendar.Event{
-		Summary:     Event.Name,
-		Description: "Event.Name",
-		Start: &calendar.EventDateTime{
-			DateTime: Event.Date,
-			TimeZone: "Asia/Irkutsk",
-		},
-		End: &calendar.EventDateTime{
-			DateTime: "",
-			TimeZone: "Asia/Irkutsk",
-		},
-	}
-	
-	return event
 }

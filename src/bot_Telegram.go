@@ -2,18 +2,20 @@ package main
 
 //go run bot_Telegram.go GalendarBot.go
 import (
+	"fmt"
 	"log"
+
 	"./GalendarBot"
 	"github.com/Syfaro/telegram-bot-api"
-	"fmt"
 )
 
 func main() {
 	bot, err := tgbotapi.NewBotAPI("559800435:AAE_aExKTPXbcwEto2qsHTHux_Wlh5McQic")
 	if err != nil {
-		log.Panic(err)
+		// log.Panic(err)
+		log.Println(err)
 	}
-	bot.Debug = true
+	// bot.Debug = true
 	log.Printf("Authorized on account %s", bot.Self.UserName)
 	// инициализируем канал, куда будут прилетать обновления от API
 	var ucfg tgbotapi.UpdateConfig = tgbotapi.NewUpdate(0)
@@ -21,13 +23,14 @@ func main() {
 	// читаем обновления из канала
 	updates, err := bot.GetUpdatesChan(ucfg)
 	if err != nil {
-		log.Panic(err)
+		// log.Panic(err)
+		log.Println(err)
 	}
 	for update := range updates {
 		// Пользователь, который написал боту
 		UserName := update.Message.From.UserName
 		userID := update.Message.From.ID
-		
+
 		// ID чата/диалога.
 		// Может быть идентификатором как чата с пользователем
 		// (тогда он равен UserNameID) так и публичного чата/канала
