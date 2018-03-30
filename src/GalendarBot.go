@@ -9,7 +9,9 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
+	"./handler"
 	"./GoogleWrap"
+	//"./sync"
 	calendar "google.golang.org/api/calendar/v3"
 )
 
@@ -55,8 +57,33 @@ func DateParse(Date string, Time string) string {
 	//log.Printf("\nДата: " + dt.Format(time.RFC3339))
 	return times
 }
+func DateTime(oldTime string, Type string) string {
+	DateTimeZone := strings.Split(oldTime, "T")
+	Date := strings.Split(DateTimeZone[0], "-")
+	TimeZone := strings.Split(DateTimeZone[1], "+")
+	Time := strings.Split(TimeZone[0], ":")
+	switch Type {
+	case "Year":
+		return Date[0]
+	case "Month":
+		return Date[1]
+	case "Day":
+		return Date[2]
+	case "Hour":
+		return Time[0]
+	case "Min":
+		return Time[1]
+	case "Zone":
+		return TimeZone[1]
+	case "Date":
+		return Date[2] + "." + Date[1] + "." + Date[0]
+	case "Time":
+		return Time[0] + "." + Time[1]
+	}
+	return Type
+}
 
-func WorkMake(Word []string) Event {
+func CreateEvent(Word []string) Event {
 	//TODO:Нужно сделать хоть как-то
 	var Work Event
 	//позиция даты
@@ -65,15 +92,20 @@ func WorkMake(Word []string) Event {
 		if len(strings.Split(Word[i], ".")) == 3 {
 			k = i
 			Work.DateTimeStart = DateParse(Word[k], Word[k+1])
-			DateTimeEnd, _ := time.Parse("2006-01-02T15:04:05+08:00", Work.DateTimeStart)
+			log.Println("Время старта события:\n" + Work.DateTimeStart)
+			DateTimeEnd, _ := time.Parse(time.RFC3339, Work.DateTimeStart)
+			log.Println("Время конца события:\n" + DateTimeEnd.Format(time.RFC3339))
 			DateTimeEnd = DateTimeEnd.Add(time.Hour)
-			Work.DateTimeEnd = DateTimeEnd.Format(time.RFC3339)
+			log.Println("Время точного конца события:\n" + DateTimeEnd.Format(time.RFC3339))
+			Work.DateTimeEnd = strings.Replace(DateTimeEnd.Format(time.RFC3339), "Z", "+", 1)
+			log.Println("Время ОКОНЧАТЕЛЬНОГО конца события:\n" + Work.DateTimeEnd)
 			Work.DateTimeLastChange = (time.Now()).Format(time.RFC3339) //Время создания/последнего изменения
 		} else {
 			Work.EventName += Word[i] + " "
 			//log.Printf("Имя события:\n" + Work.Name + "\n")
 		}
 	}
+	Work.EventName = strings.Trim(Work.EventName, " ")
 	//если длина текста больше 3 слов
 	if k == 0 {
 		//Work.Date = ""
@@ -86,7 +118,9 @@ func WorkMake(Word []string) Event {
 	// 	Work.Time = ""
 	// }
 	//если длина текста больше 5 слов
-	if len(Word) >= 5 {
+
+	if len(Word) >= k {
+
 		Work.Importance = Word[k]
 		k++
 	} else {
@@ -103,29 +137,117 @@ func WorkMake(Word []string) Event {
 	return Work
 }
 
-func ParseText(Text string, UserName string) string {
+func ChangeEvent(Events []Event, Word []string) []Event {
+	ChangedName := Word[1]
+	//изменение имени события
+	NewName := Word[2]
+	var k int
+	for event := 0; event < len(Events); event++ {
+
+		log.Println("Получили событие " + Events[event].EventName)
+
+		//Если нашли событие
+		if Events[event].EventName == ChangedName {
+			Events[event].EventName = NewName
+			k = event
+		}
+	}
+	//парсер на дату время
+	for wrd := 2; wrd < len(Word); wrd++ {
+		// var oldDate string
+		// var newTime []string
+		//Если Дата
+		if len(strings.Split(Word[wrd], ".")) == 3 {
+			// oldHour := DateTime(Events[k].DateTimeStart, "Hour")
+			// oldMin := DateTime(Events[k].DateTimeStart, "Min")
+			// log.Println("!!Час: " + oldHour)
+			// log.Println("!!Минуты: " + oldMin)
+			Events[k].DateTimeStart = DateParse(Word[wrd], DateTime(Events[k].DateTimeStart, "Time"))
+			DateTimeEnd, _ := time.Parse("2006-01-02T15:04:05+08:00", Events[k].DateTimeStart)
+			DateTimeEnd = DateTimeEnd.Add(time.Hour)
+			Events[k].DateTimeEnd = DateTimeEnd.Format(time.RFC3339)
+			Events[k].DateTimeLastChange = (time.Now()).Format(time.RFC3339) //Время создания/последнего изменения
+		}
+		//Если время
+		if len(strings.Split(Word[wrd], ".")) == 2 {
+			oldDate := DateTime(Events[k].DateTimeStart, "Date")
+			log.Println("!Дата: " + oldDate)
+			// newTime = strings.Split(Word[wrd], ".")
+			Events[k].DateTimeStart = DateParse(oldDate, Word[wrd])
+			DateTimeEnd, _ := time.Parse(time.RFC3339, Events[k].DateTimeStart)
+			DateTimeEnd = DateTimeEnd.Add(time.Hour)
+			log.Println("Время ОКОНЧАТЕЛЬНОГО конца события:\n" + DateTimeEnd.Format(time.RFC3339))
+			Events[k].DateTimeEnd = strings.Replace(DateTimeEnd.Format(time.RFC3339), "Z", "+", 1)
+			Events[k].DateTimeLastChange = (time.Now()).Format(time.RFC3339) //Время создания/последнего изменения
+		}
+
+		if strings.ToLower(Word[wrd]) != Events[k].Importance {
+			Events[k].Importance = strings.ToLower(Word[wrd])
+		}
+	}
+
+	Events[k].Changed = true
+	return Events
+}
+
+func DeleteEvent(Events []Event, Word []string) []Event {
+	DeletedName := Word[1]
+	var MatchedEventId []int
+	for event := 0; event < len(Events); event++ {
+
+		log.Println("Получили событие " + Events[event].EventName)
+
+		//Если нашли событие
+		if Events[event].EventName == DeletedName {
+			MatchedEventId = append(MatchedEventId, event)
+			log.Println("Нашли событие " + Events[event].EventName)
+		}
+	}
+	if len(MatchedEventId) > 1 {
+		//Предлагаем на удаление
+	} else {
+		//удаляем 1 событие
+
+		//Удаляем через синхронизацию
+		Events[MatchedEventId[0]].Deleted = true
+
+		//Удаление здесь
+		//Events = Remv(Events, MatchedEventId[0])
+	}
+	return Events
+}
+
+//удаление элемента из массива без сортировки
+//то есть просто последний перемещаем на место удаляемого и возвращаем на 1 короче
+func Remv(events []Event, id int) []Event {
+	log.Println("Удаляемое " + events[id].EventName)
+	log.Println("Вставляемое " + events[len(events)-1].EventName)
+	events[id] = events[len(events)-1]
+	log.Println("Получили " + events[id].EventName)
+	return events[:len(events)-1]
+}
+
+func ParseText(Text string, UserID string) string {
 	//TODO: Разделить строку на соответствующие части
 	//Добавить Купить еды 15.06.12 16.45 Важно Домашние дела.
 	var Work JsonStruct
 	Word := strings.Split(Text, " ") //"Дело, на дату, время, с пометкой важности")
 	//действие по первому ключевому слову
-	Work = ReadJson(UserName)
+	Work = ReadJson(UserID)
 	// log.Println(Work.Areas[])
-	if Work.Areas == nil {
-		ar := Area{"Неразмечено", nil}
-		Work.Areas = append(Work.Areas, ar)
-	}
-	Work.Areas[0].Events = append(Work.Areas[0].Events, WorkMake(Word))
+
+	//Work.Areas[0].Events = append(Work.Areas[0].Events, CreateEvent(Word))
 	// log.Printf(Work.Date.Format(time.RFC3339))
 	switch Word[0] {
-	case "Код":
-		if GoogleWrap.SaveToken(Word[1], UserName) {
+	case "Код", "код":
+		if GoogleWrap.SaveToken(Word[1], UserID) {
 			return "Авторизирован"
 		}
 		break
 	case "Добавить":
-		if WriteJson(UserName, Work) {
-			// 	if CreateWork(Work, UserName) {
+		Work.Areas[0].Events = append(Work.Areas[0].Events, CreateEvent(Word))
+		if WriteJson(UserID, Work) {
+			// 	if CreateWork(Work, UserID) {
 			return "Добавлено." //successful
 			// 	} else {
 			// 		break //go to the Failed
@@ -133,20 +255,23 @@ func ParseText(Text string, UserName string) string {
 		} else {
 			break //go to the Failed
 		}
-		if CreateWork(Work, UserName) {
+		if CreateWork(Work, UserID) {
 			return "Добавлено." //successful
 		} else {
 			break //go to the Failed
 		}
 
 	case "Изменить":
-		if ChangeWork(Work, UserName) {
+		// if ChangeWork(Work, UserID) {
+		Work.Areas[0].Events = ChangeEvent(Work.Areas[0].Events, Word)
+		if WriteJson(UserID, Work) {
 			return "Изменено." //successful
 		} else {
 			break //go to the Failed
 		}
 	case "Удалить":
-		if DeleteWork(Work, UserName) {
+		Work.Areas[0].Events = DeleteEvent(Work.Areas[0].Events, Word)
+		if WriteJson(UserID, Work) {
 			return "Удалено." //successful
 		} else {
 			break //go to the Failed
@@ -156,7 +281,7 @@ func ParseText(Text string, UserName string) string {
 	case "Дела":
 		if len(Word) > 1 {
 			if Word[1] == "на" {
-				return "Дела на завтра:\n" + GetWorksOnTomorrow(UserName) //функцию
+				return "Дела на завтра:\n" + GetWorksOnTomorrow(UserID) //функцию
 			}
 			//TODO: Распасрсить дату(((((
 			//_, err:=time.Parse("01.01.1970",Word[1])
@@ -164,10 +289,10 @@ func ParseText(Text string, UserName string) string {
 			if TryDateParse(Word[1]) {
 				log.Printf("Ошибка:" + Word[1])
 				Date := DateParse(Word[1], "00.00")
-				return "Дела на " + Word[1] + ":\n" + GetWorksOnDate(Date, UserName) //функцию
+				return "Дела на " + Word[1] + ":\n" + GetWorksOnDate(Date, UserID) //функцию
 			}
 		}
-		return "Дела на сегодня:\n" + GetWorks(UserName) //функцию
+		return "Дела на сегодня:\n" + GetWorks(UserID) //функцию
 	default:
 		return "У нас проблема("
 	}
@@ -176,7 +301,7 @@ func ParseText(Text string, UserName string) string {
 
 //Структура json-файла пользователя
 type JsonStruct struct {
-	UserName string   //Имя пользователя
+	UserID   string   //Имя пользователя
 	Settings settings //Настройки
 	Areas    []Area   //Сфры дейтельности
 
@@ -190,6 +315,7 @@ type Area struct {
 
 //Структура дел	*-по Google API
 type Event struct {
+	EventId            string                 //ИД события*
 	EventName          string                 //Название дела
 	DateTimeLastChange string                 //Дата и время последнего изменения
 	Description        string                 //Описания*
@@ -201,6 +327,8 @@ type Event struct {
 	ColorId            string                 //Важность, но в цвете*
 	//Area               string                 //Сфера дейтельности
 	InTheCalendar bool   //добавлено ли в G-календарь?
+	Deleted       bool   //Удалён?
+	Changed       bool   //Изменён
 	Created       string //Время создания события* RFC3339
 	Updated       string //Время изменения события* RFC3339
 }
@@ -210,8 +338,8 @@ type settings struct {
 	CountWorkPerDay int
 }
 
-func ReadJson(UserName string) JsonStruct {
-	file, _ := os.Open(UserName + ".json")
+func ReadJson(UserID string) JsonStruct {
+	file, _ := os.Open(UserID + ".json")
 	defer file.Close()
 
 	JsonFile, _ := ioutil.ReadAll(file)
@@ -220,45 +348,46 @@ func ReadJson(UserName string) JsonStruct {
 	return JsonStructIn
 }
 
-func CreateUser(UserName string) bool {
-	_, err := os.Create(UserName + ".json")
+func CreateUser(UserID string) bool {
+	_, err := os.Create(UserID + ".json")
 	if err != nil {
 		return false
 	}
 	var Work JsonStruct
-	Work.UserName = UserName
-	WriteJson(UserName, Work)
+	Work.UserID = UserID
+	Work.Areas = append(Work.Areas, Area{"Неразмечено", nil})
+	WriteJson(UserID, Work)
 	return true
 }
 
 //надо придумать название
-func ddd(UserName string) {
-	if CreateUser(UserName) {
-		log.Println("Успешно создан файл пользователя " + UserName)
+func ddd(UserID string) {
+	if CreateUser(UserID) {
+		log.Println("Успешно создан файл пользователя " + UserID)
 	} else {
-		log.Println("Не удалось создать файл пользователя " + UserName)
+		log.Println("Не удалось создать файл пользователя " + UserID)
 	}
 	// var Work JsonStruct
 	// js, _ := json.Marshal(Work)
-	// ioutil.WriteFile(UserName+".json", js, 0644)
+	// ioutil.WriteFile(UserID+".json", js, 0644)
 
 }
 
-func WriteJson(UserName string, Work JsonStruct) bool {
+func WriteJson(UserID string, Work JsonStruct) bool {
 	js, err := json.Marshal(Work)
 	if err != nil {
 		log.Println("Failed Json Marshal")
 		return false
 	}
-	ioutil.WriteFile(UserName+".json", js, 0644)
+	ioutil.WriteFile(UserID+".json", js, 0644)
 	return true
 }
 
-func ParseCommand(Command string, UserName string) string {
+func ParseCommand(Command string, UserID string) string {
 	switch Command {
 	case "start":
 		//регистрация
-		ddd(UserName)
+		ddd(UserID)
 		return "Привет. Что бы начать работать тебе нужно перейти по ссылке \n" + GoogleWrap.GetTokenURL() + " \nи авторизоваться в Google-Календаре." //Заглушка
 
 	}
@@ -272,43 +401,43 @@ func GetHelp() string {
 		"3) \"Удалить ИМЯ ДАТА\""
 }
 
-func Auth(UserName string) string {
+func Auth(UserID string) string {
 	//запрос к bot_Galendar
 	return "URL:edrfyujilkuydfasthd"
 }
 
-func GetWorks(UserName string) string {
-	GoogleWrap.Auth(UserName)
+func GetWorks(UserID string) string {
+	GoogleWrap.Auth(UserID)
 	return GoogleWrap.ShowEvents()
 	//запрос к bot_Galendar
 	return "1. Написать бота"
 }
 
-func GetWorksOnDate(Dates string, UserName string) string {
+func GetWorksOnDate(Dates string, UserID string) string {
 	//запрос к bot_Galendar
 	return "1. Написать бота на дату " //+ Dates.Format(time.RFC822)
 }
 
-func GetWorksOnTomorrow(UserName string) string {
+func GetWorksOnTomorrow(UserID string) string {
 	//запрос к bot_Galendar
 	return "1. Написать бота завтра"
 }
 
-func CreateWork(Work JsonStruct, UserName string) bool {
-	// GoogleWrap.Auth(UserName)
-	Workevent := ConverToDOtoEvent(Work.Areas[0].Events[0])
-	log.Printf("\n11111111111111111111111\n" + Work.UserName)
-	return GoogleWrap.AddEvent(Workevent, Work.UserName)
+func CreateWork(Work JsonStruct, UserID string) bool {
+	// GoogleWrap.Auth(UserID)
+	//Workevent := ConverToDOtoEvent(Work.Areas[0].Events[0])
+	//log.Printf("\n11111111111111111111111\n" + Work.UserID)
+	//return GoogleWrap.AddEvent(Workevent, Work.UserID)
 	//запрос к bot_Galendar
 	return true
 }
 
-func ChangeWork(Work JsonStruct, UserName string) bool {
+func ChangeWork(Work JsonStruct, UserID string) bool {
 	//запрос к bot_Galendar
 	return true
 }
 
-func DeleteWork(Work JsonStruct, UserName string) bool {
+func DeleteWork(Work JsonStruct, UserID string) bool {
 	//запрос к bot_Galendar
 	return true
 }
@@ -316,7 +445,7 @@ func DeleteWork(Work JsonStruct, UserName string) bool {
 func ConverToDOtoEvent(Event Event) *calendar.Event {
 	event := &calendar.Event{
 		Summary:     Event.EventName,
-		Description: "Event.Name",
+		Description: Event.EventName,
 		Start: &calendar.EventDateTime{
 			DateTime: Event.DateTimeStart,
 			TimeZone: "Asia/Irkutsk",
@@ -328,4 +457,41 @@ func ConverToDOtoEvent(Event Event) *calendar.Event {
 	}
 
 	return event
+}
+
+func prepareForParse(msg string) []string {
+	return strings.Split(msg, ":")
+}
+
+func main() {
+
+	log.Println("Starting service Calendar")
+	
+	/*
+		initialize handler
+		we sent string channel to Handler.
+		handler load to this channel message from telegram's users
+	*/
+	var msgCh chan string	
+	msgCh = make(chan string)
+	go handler.Handle(msgCh)
+	
+	for {
+		text := <-msgCh
+		divided := prepareForParse(text)
+		msg, UserID := divided[0], divided[1]
+		
+		var reply string
+		if len(divided) == 3 {
+			reply = ParseCommand(msg, UserID)
+			log.Println(reply)
+		} else {
+			reply = ParseText(msg, UserID)
+			log.Println(reply)
+		}
+		
+		msgCh <- reply		
+			
+	}
+	
 }

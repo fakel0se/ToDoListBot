@@ -23,7 +23,7 @@ var Srv *calendar.Service
 //использует Context и Config для извлечения токена
 //затем генеруруем клиент, return возвращает сгенерированного клиента
 func getConfig() *oauth2.Config {
-	b, err := ioutil.ReadFile("../GalendarBot/GoogleWrap/client_secret.json")
+	b, err := ioutil.ReadFile("./GoogleWrap/client_secret.json")
 	if err != nil {
 		log.Fatalf("Не удается прочитать секретный файл клиента: %v", err)
 		return nil

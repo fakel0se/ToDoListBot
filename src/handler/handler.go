@@ -8,10 +8,10 @@ import (
 	"github.com/Syfaro/telegram-bot-api"
 )
 
-func handler(chan) {
-	bot, err := tgbotapi.NewBotAPI("559800435:AAE_aExKTPXbcwEto2qsHTHux_Wlh5McQic")
+func Handle(msgCh chan string) {
+	bot, err := tgbotapi.NewBotAPI("559800435:AAE_aExKTPXbcwEto2qsHTHux_Wlh5McQic") 
+	//bot, err := tgbotapi.NewBotAPI("550460139:AAEG56gf2hI2NyjmpbeAkpxQR7hMlNdNhyU")
 	if err != nil {
-		// log.Panic(err)
 		log.Println(err)
 	}
 	
@@ -42,15 +42,18 @@ func handler(chan) {
 		var reply string
 		var Text string
 		if update.Message.Command() != "" {
+			msgCh <- fmt.Sprint(update.Message.Command(), ":", userID, ":")
 			//reply = GalendarBot.ParseCommand(update.Message.Command(), fmt.Sprint(userID))
 		} else {
 			//Получем сообщение и парсим его
 			Text = update.Message.Text
+			msgCh <- fmt.Sprint(Text, ":", userID)
 			//reply = GalendarBot.ParseText(Text, fmt.Sprint(userID))
 		}
-
+						
 		log.Printf("[%s] %d %s", UserName, ChatID, Text)
-
+		
+		reply = <-msgCh
 		// Созадаем сообщение
 		msg := tgbotapi.NewMessage(ChatID, reply)
 		// и отправляем его
