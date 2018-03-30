@@ -1,4 +1,4 @@
-package GalendarBot
+package main
 
 import (
 	"log"
