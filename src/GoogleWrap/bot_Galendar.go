@@ -120,8 +120,10 @@ func tokenCacheFile(username string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	log.Println(usr.HomeDir)
-	tokenCacheDir := filepath.Join("../temp/", ".credentials")
+	tokenCacheDir := filepath.Join("./temp/", ".credentials")
+	usre, _ := filepath.Abs(tokenCacheDir) 
+	log.Println(usr.HomeDir, usre)
+	
 	os.MkdirAll(tokenCacheDir, 0700)
 	return filepath.Join(tokenCacheDir,
 		url.QueryEscape("calendar"+username+".json")), err
